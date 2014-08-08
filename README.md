@@ -3,7 +3,7 @@
 Wrapped up in a bookmarklet application to use in your web browser.
 
 ##Use Cases
-List your favorite sites
+List your favorite feeds
 Add an RSS or Atom URL feed
 Delete a feed
 Display a RSS or Atom feed/list of articles
