@@ -1,5 +1,5 @@
 #Will Read
-##An RSS and Atom Reader
+##An RSS and Atom Reader, Bookmarklet App
 Wrapped up in a bookmarklet application to use in your web browser.
 
 ##Use Cases
