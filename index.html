@@ -9,46 +9,87 @@
 		<section id="mainArea"></section>
 	</body>
 	<script>
+		var Observable = function(){
+			var observers = {};
+			var self = {
+				observe: function(key, observer){
+					if(observers[key] === undefined) observers[key] = [];
+					observers[key].push(observer);
+				}
+				, stopObserving: function(observer){
+					for(var key in observers){
+						var i = 0;
+						var ubounds = observers[key].length;				
+						for(i; i < ubounds; i++){
+							if(observers[key][i] === observer){
+								observers[key].splice(i, 1);
+								if(observers[key].length === 0) delete observers[key];
+								break;
+							}
+						}
+					}
+				}
+				, changed: function(key, old, v){
+					if(observers[key] === undefined) return;
+					var i = 0;
+					var ubounds = observers[key].length;
+					for(i; i<ubounds; i++){
+						observers[key][i](key, old, v, this);
+					}
+				}
+				, release: function(){
+					var key = null;
+					for(key in observers){
+						var observer = null;
+						while(observer = observers[key].pop()){}			
+					}
+				}
+			};
+			return self;
+		};
+		
+		var List = function(list){
+			var innerList = list || [];
+			var self = Observable();
+			Object.defineProperty(self, 'length', {
+				get: function(){ return innerList.length;}
+				, enumerable: true
+			});
+			Object.defineProperty(self, 'all', {
+				get: function(){ return innerList;}
+				, enumerable: true
+			});
+			self.push = function(feed){
+				innerList.push(feed);
+				this.changed('push', null, feed);
+			};
+			self.remove = function(delegate){
+				var i = 0;
+				var ubounds = innerList.length;
+				var deleted = [];
+				for(i; i < ubounds; i++){
+					if(delegate(innerList[i])){
+						deleted = innerList.splice(i, 1);
+						this.changed('remove', deleted[0], i);
+						break;
+					}
+				}
+				return deleted[0];
+			};
+			return self;
+		};
+		
+		var model = List();
 		var favoriteFeeds = function(){
 			return model;
 		};
-	
 		var addFeed = function(url){
 			model.push({url: url});
 		};
-	
 		var deleteFeed = function(url){
 			return model.remove(function(feed){
 				return feed.url === url;
 			});
-		};
-
-		var model = [];
-		var oldPush = model.push;
-		var oldFilter = model.filter;
-		var observers = {};
-		model.changed = function(key, old, v){
-			if(!observers[key])return;
-			observers[key].forEach(function(observer){
-				observer.update(key, old, v, this);
-			});
-		};
-		model.push = function(feed){
-			oldPush.call(this, feed);
-			this.changed('push', null, feed);
-		};
-		model.remove = function(delegate){
-			var i = 0;
-			var ubounds = this.length;
-			var deleted = [];
-			for(i; i < ubounds; i++){
-				if(delegate(this[i])){
-					deleted = this.splice(i, 1);
-					this.changed('remove', deleted[0], i);
-					break;
-				}
-			}
-			return deleted[0];
 		};
 		addFeed('http://backend.deviantart.com/rss.xml?type=deviation&q=boost%3Apopular+in%3Adigitalart%2Fdrawings+frogs');
 		addFeed('http://digg.com/rss/top.rss');
