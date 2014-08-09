@@ -78,7 +78,61 @@
 			};
 			return self;
 		};
+		var View = function(container, controller){
+			var self = {
+				container: container
+				, controller: controller
+				, views: []
+				, release: function release(){
+					if(!this.container.parentNode) return;
+					this.container.parentNode.removeChild(this.container);
+					this.controller.release();
+					var view = null;
+					while(view = this.views.pop()) view.release();
+				}
+			};
+			self.controller.setView(self);
+			return self;
+		};
+		var Controller = function Controller(delegate, model){
+			var self = {
+				model: model
+				, delegate: delegate
+				, release: function release(){}
+				, view: null
+			};
+			self.setView = function(v){
+				this.view = v;
+			};
+			self.release = function(){
+				if(model.release) model.release();
+			}
+			return self;
+		};
 		
+		var FeedView = function(container, controller){
+			var self = View(container, controller);
+			function addLink(link){
+				var a = document.createElement('a');				
+				a.setAttribute('href', link.url);
+				self.container.appendChild(a);
+			}
+			self.added = function(key, old, v, m){				
+				addLink(v);
+			};
+			self.removed = function(key, old, v, m){
+				var elem = this.container.querySelector('[href="' + v.url + '"]');
+				this.container.parentNode.removeChild(elem);
+			};
+			controller.model.observe('push', self.added);
+			controller.model.observe('remove', self.removed);
+			return self;
+		};
+		var FeedController = function(delegate, model){
+			var self = Controller(delegate, model);
+			
+			return self;
+		};
 		var model = List();
 		var favoriteFeeds = function(){
 			return model;
@@ -91,6 +145,8 @@
 				return feed.url === url;
 			});
 		};
+		
+		var feedView = FeedView(document.getElementById('feeds'), FeedController(null, model));
 		addFeed('http://backend.deviantart.com/rss.xml?type=deviation&q=boost%3Apopular+in%3Adigitalart%2Fdrawings+frogs');
 		addFeed('http://digg.com/rss/top.rss');
 		addFeed('http://www.reddit.com/.rss');
