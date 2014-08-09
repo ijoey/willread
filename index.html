@@ -9,6 +9,52 @@
 		<section id="mainArea"></section>
 	</body>
 	<script>
+		var favoriteFeeds = function(){
+			return model;
+		};
 	
+		var addFeed = function(url){
+			model.push({url: url});
+		};
+	
+		var deleteFeed = function(url){
+			return model.remove(function(feed){
+				return feed.url === url;
+			});
+		};
+
+		var model = [];
+		var oldPush = model.push;
+		var oldFilter = model.filter;
+		var observers = {};
+		model.changed = function(key, old, v){
+			if(!observers[key])return;
+			observers[key].forEach(function(observer){
+				observer.update(key, old, v, this);
+			});
+		};
+		model.push = function(feed){
+			oldPush.call(this, feed);
+			this.changed('push', null, feed);
+		};
+		model.remove = function(delegate){
+			var i = 0;
+			var ubounds = this.length;
+			var deleted = [];
+			for(i; i < ubounds; i++){
+				if(delegate(this[i])){
+					deleted = this.splice(i, 1);
+					this.changed('remove', deleted[0], i);
+					break;
+				}
+			}
+			return deleted[0];
+		};
+		addFeed('http://backend.deviantart.com/rss.xml?type=deviation&q=boost%3Apopular+in%3Adigitalart%2Fdrawings+frogs');
+		addFeed('http://digg.com/rss/top.rss');
+		addFeed('http://www.reddit.com/.rss');
+		addFeed('https://news.ycombinator.com/rss');
+		addFeed('http://readwrite.com/rss.xml');
+		addFeed('http://www.theverge.com/rss/frontpage');
 	</script>
 </html>
