@@ -21,26 +21,56 @@
 			border-right: 1px solid #dbdbdb;
 			background: #eee;
 		}
+		#sidebar a{
+			display: block;
+			height: 2em;
+			line-height: 2em;
+			width: 100%;
+			border-bottom: solid 1px #d2d2d2;
+			text-indent: 1em;
+			overflow: hidden;
+		}
 		#mainArea{
 			margin-left: 300px;
+			padding-left: 2em;
 		}
 		nav a{
 			display: block;
 		}
 		img{
-			width: 100%;
+			max-width: 100%;
 		}
-		
+		article{
+			position: relative;
+			border: 1px solid #dbdbdb;
+			border-width: 0 0 1px;
+			box-shadow: 0 1px 1px 0 rgba(0,0,0,0.07);
+			padding: 30px 0;
+		}
+		#addView{
+			display: none;
+		}
 		</style>
 	</head>
 	<body>
 		<section id="sidebar">
 			<nav id="feeds"></nav>
+			<footer>
+				<div id="addView">
+					<form>
+						<fieldset>
+							<input type="text" name="newFeedUrl" placeholder="Url" />
+						</fieldset>
+					</form>
+				</div>
+				<button id="addButton">Add</button>
+			</footer>
 		</section>
 		<section id="mainArea"></section>
 	</body>
 	<script>
-		var Xml = (function(){
+		var my = {lib: {}, View: {}, Controller: {}, Observable: {}, List: {}};
+		my.lib.Xml = (function(){
 			function parseText (sValue) {
 			  if (/^\s*$/.test(sValue)) { return null; }
 			  if (/^(?:true|false)$/i.test(sValue)) { return sValue.toLowerCase() === "true"; }
@@ -81,7 +111,7 @@
 				toJson: getJXONTree
 			};
 		})();
-		var Observable = function(){
+		my.Observable = function(){
 			var observers = {};
 			var self = {
 				observe: function(key, observer){
@@ -119,9 +149,9 @@
 			};
 			return self;
 		};
-		var List = function(list){
+		my.List = function(list){
 			var innerList = list || [];
-			var self = Observable();
+			var self = my.Observable();
 			Object.defineProperty(self, 'length', {
 				get: function(){ return innerList.length;}
 				, enumerable: true
@@ -157,7 +187,7 @@
 			};
 			return self;
 		};
-		var View = function(container, controller){
+		my.View = function(container, controller){
 			var self = {
 				container: container
 				, controller: controller
@@ -169,11 +199,21 @@
 					var view = null;
 					while(view = this.views.pop()) view.release();
 				}
+				, clear: function(){
+					while (this.container.lastChild) {
+					  this.container.removeChild(this.container.lastChild);
+					}
+				}
 			};
+			Object.defineProperty(self, 'isHidden', {
+				get: function(){
+					return this.container.style.display === 'none';}
+				, enumerable: true
+			});
 			self.controller.setView(self);
 			return self;
 		};
-		var Controller = function Controller(delegate, model){
+		my.Controller = function(delegate, model){
 			var self = {
 				model: model
 				, delegate: delegate
@@ -182,15 +222,15 @@
 			};
 			self.setView = function(v){
 				this.view = v;
-				if(this.didSetView) this.didSetView();
+				if(this.didSetView) this.didSetView(v);
 			};
 			self.release = function(){
 				if(model.release) model.release();
 			}
 			return self;
 		};
-		var Feed = function(obj){
-			var self = Observable();
+		my.Feed = function(obj){
+			var self = my.Observable();
 			function getLink(obj){
 				return {
 					href: obj.channel ? obj.channel.link : obj.link['@href']
@@ -218,14 +258,17 @@
 			function getTitle(obj){
 				return obj.title || obj.channel.title;
 			}
-			self.link = getLink(obj);
-			self.entries = getEntries(obj);
-			self.icon = getIcon(obj);
-			self.title = getTitle(obj);
+			if(obj){
+				self.link = getLink(obj);
+				self.entries = getEntries(obj);
+				self.icon = getIcon(obj);
+				self.title = getTitle(obj);
+				self.url = obj.url;
+			}
 			return self;
 		};
-		var FeedList = function(){
-			var self = List();
+		my.List.Feed = function(){
+			var self = my.List();
 			var active = null;
 			Object.defineProperty(self, 'active', {
 				get: function(){return active;}
@@ -237,11 +280,12 @@
 			})
 			return self;
 		};
-		var FeedsView = function(container, controller){
-			var self = View(container, controller);
+		my.View.Feeds = function(container, controller){
+			var self = my.View(container, controller);
 			function addLink(feed){
 				var a = document.createElement('a');				
-				a.setAttribute('href', feed.link.href);
+				a.href = feed.link.href;
+				a.title = feed.title;
 				a.innerHTML = feed.title;
 				self.container.appendChild(a);
 			}
@@ -249,20 +293,19 @@
 				addLink(v);
 			};
 			self.removed = function(key, old, v, m){
-				var elem = this.container.querySelector('[href="' + v.url + '"]');
-				this.container.parentNode.removeChild(elem);
+				var elem = self.container.querySelector('[title="' + old.title + '"]');
+				self.container.removeChild(elem);
 			};
 			controller.model.observe('push', self.added);
 			controller.model.observe('remove', self.removed);
-			self.views.push(ColumnView(self.container, ColumnController(self.controller, self.controller.model)));
 			return self;
 		};
-		var ColumnView = function(container, controller){
-			var self = View(container, controller);
+		my.View.Column = function(container, controller){
+			var self = my.View(container, controller);
 			return self;
 		};
-		var ColumnController = function(delegate, model){
-			var self = Controller(delegate, model);
+		my.Controller.Column = function(delegate, model){
+			var self = my.Controller(delegate, model);
 			function resize(height){
 				self.view.container.style['height'] = height + 'px';
 			}
@@ -282,8 +325,8 @@
 			};
 			return self;
 		};
-		var FeedController = function(delegate, model){
-			var self = Controller(delegate, model);
+		my.Controller.Feeds = function(delegate, model){
+			var self = my.Controller(delegate, model);
 			self.handleEvent = function(e){
 				e.preventDefault();
 				if(e.target.nodeName !== 'A') return;
@@ -295,28 +338,84 @@
 			return self;
 		};
 		
-		var ActiveFeedView = function(container, controller){
-			var self = View(container, controller);
+		my.View.ActiveFeed = function(container, controller){
+			var self = my.View(container, controller);
 			self.activeWasUpdated = function(key, old, v, m){
-				self.container.innerHTML = '';
+				self.clear();
 				v.entries.forEach(function(entry){
-					var div = document.createElement('div');
-					var header = document.createElement('h1');
 					var article = document.createElement('article');
-					header.innerHTML = '<a href="{href}">{title}</a>'.replace(/\{href\}/, entry.content.id).replace(/\{title\}/, entry.content.title);
-					article.innerHTML = entry.content.keyValue;
-					div.appendChild(header);
-					div.appendChild(article);
-					self.container.appendChild(div);
+					var header = document.createElement('header');
+					var h1 = document.createElement('h1');
+					var div = document.createElement('div');
+					h1.innerHTML = '<a href="{href}">{title}</a>'.replace(/\{href\}/, entry.content.id).replace(/\{title\}/, entry.content.title);
+					div.innerHTML = entry.content.keyValue;
+					header.appendChild(h1);
+					article.appendChild(header);
+					article.appendChild(div);
+					self.container.appendChild(article);
 				});
 			};
 			controller.model.observe('active', self.activeWasUpdated);
-		};
-		var ActiveFeedController = function(delegate, model){
-			var self = Controller(delegate, model);
 			return self;
 		};
-		var model = FeedList();
+		my.Controller.ActiveFeed = function(delegate, model){
+			var self = my.Controller(delegate, model);
+			return self;
+		};
+		my.View.AddButton = function(container, controller){
+			var self = my.View(container, controller);
+			Object.defineProperty(self, 'text', {
+				get: function(){ return this.container.innerHTML;}
+				, set: function(v){this.container.innerHTML = v;}
+				, enumerable: true
+			});
+			return self;
+		};
+		my.Controller.AddButton = function(delegate, model){
+			var self = my.Controller(delegate, model);
+			var feed = my.Feed();
+			self.handleEvent = function(e){
+				this.delegate.addButtonWasClicked(this);
+			};
+			self.didSetView = function(v){
+				this.view.container.addEventListener('click', self, true);
+			};
+			return self;
+		};
+		my.View.AddView = function(container, controller){
+			var self = my.View(container, controller);
+			var urlField = self.container.querySelector('input');
+			self.container.id = 'addView';
+			self.show = function(){
+				this.container.style.display = 'block';
+			};
+			self.hide = function(){
+				this.container.style.display = 'none';
+			};
+			Object.defineProperty(self, 'url', {
+				get: function(){ return urlField.value;}
+				, set: function(v){
+					urlField.value = v;
+				}
+				, enumerable: true
+			})
+			return self;
+		}
+		my.Controller.AddView = function(delegate, model){
+			var self = my.Controller(delegate, model);
+			self.handleEvent = function(e){
+				e.preventDefault();
+				if(this.view.url.length === 0) return;
+				this.model = this.view.url;
+				this.delegate.newFeedWasSubmitted(this.model);
+				this.view.url = '';
+			};
+			self.didSetView = function(v){
+				this.view.container.querySelector('form').addEventListener('submit', this, true);
+			};
+			return self;
+		}
+		var model = my.List.Feed();
 		model.active = null;
 		var favoriteFeeds = function(){
 			return model;
@@ -331,8 +430,9 @@
 					var i = 0;
 					var root = e.target.responseXML.childNodes[i];
 					while(!root.hasAttributes && i < 10) root = e.target.responseXML.childNodes[i++];
-					var feed = Xml.toJson(root);
-					model.push(Feed(feed));
+					var feed = my.lib.Xml.toJson(root);
+					feed.url = e.target.responseXML.URL;
+					model.push(my.Feed(feed));
 				}
 			}
 			, errorDidHappen: function(e){
@@ -340,30 +440,64 @@
 			}
 			, feedLinkWasClicked: function(link){
 				model.active = model.find(function(i, feed){
-					return feed.link.href === link.href;
+					return feed.title === link.title;
 				});
+				window.document.title = model.active.title;
+				window.scrollTo(0,0);
+			}
+			, addButtonWasClicked: function(controller){
+				var addView = this.views.filter(function(v){
+					return v.container.id === 'addView';
+				})[0];
+				var addButton = this.views.filter(function(v){
+					return v.container.id === 'addButton';
+				})[0];
+				if(addView.isHidden){
+					addButton.text = 'Done';
+					addView.show();
+				}else{
+					addButton.text = 'Add';
+					addView.hide();
+				}
+			}
+			, newFeedWasSubmitted: function(url){
+				addFeed(url, this);
+			}
+			, feedWasAdded: function(key, old, v, m){
+				var urls = JSON.parse(localStorage.willRead);
+				if(urls.some(function(url){return url === v.url})) return;
+				urls.push(v.url);
+				localStorage.willRead = JSON.stringify(urls);
+			}
+			, feedWasRemoved: function(key, old, v, m){
+				var urls = JSON.parse(localStorage.willRead);
+				var newUrls = urls.filter(function(url){
+					return url !== old.url;
+				});
+				localStorage.willRead = JSON.stringify(newUrls);
 			}
 			, views: []
 		};
+		model.observe('push', app.feedWasAdded);
+		model.observe('remove', app.feedWasRemoved);		
 		var addFeed = function(url, handler){
 			var xhr = new XMLHttpRequest();
 			xhr.addEventListener('readystatechange', handler);
 			xhr.open('get', url, true);
 			xhr.send();
 		};
-		var deleteFeed = function(url){
+		var deleteFeed = function(title){
 			return model.remove(function(feed){
-				return feed.url === url;
+				return feed.title === title;
 			});
 		};
-		
-		app.views.push(FeedsView(document.getElementById('feeds'), FeedController(app, model)));
-		app.views.push(ActiveFeedView(document.getElementById('mainArea'), ActiveFeedController(app, model)));
-		addFeed('http://backend.deviantart.com/rss.xml?type=deviation&q=boost%3Apopular+in%3Adigitalart%2Fdrawings+frogs', app);
-		addFeed('http://digg.com/rss/top.rss', app);
-		addFeed('http://www.reddit.com/.rss', app);
-		addFeed('https://news.ycombinator.com/rss', app);
-		addFeed('http://readwrite.com/rss.xml', app);
-		addFeed('http://www.theverge.com/rss/frontpage', app);
+		app.views.push(my.View.Column(document.getElementById('sidebar'), my.Controller.Column(app, model)));
+		app.views.push(my.View.Feeds(document.getElementById('feeds'), my.Controller.Feeds(app, model)));
+		app.views.push(my.View.ActiveFeed(document.getElementById('mainArea'), my.Controller.ActiveFeed(app, model)));
+		app.views.push(my.View.AddButton(document.getElementById('addButton'), my.Controller.AddButton(app, model)));
+		app.views.push(my.View.AddView(document.getElementById('addView'), my.Controller.AddView(app, model)));
+		var urls = [];
+		if(localStorage.willRead) urls = JSON.parse(localStorage.willRead);
+		urls.forEach(function(url){addFeed(url, app);});
 	</script>
 </html>
