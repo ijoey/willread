@@ -50,6 +50,10 @@
 		#addView{
 			display: none;
 		}
+		.selected{
+			background: black;
+			color: white;
+		}
 		</style>
 	</head>
 	<body>
@@ -292,6 +296,13 @@
 			self.added = function(key, old, v, m){				
 				addLink(v);
 			};
+			self.shouldSelect = function(target){
+				var links = this.container.querySelectorAll('a');
+				for(var i = 0; i < links.length; i++){
+					links[i].className = '';
+					if(links[i] === target) links[i].className = 'selected';
+				}
+			};
 			self.removed = function(key, old, v, m){
 				var elem = self.container.querySelector('[title="' + old.title + '"]');
 				self.container.removeChild(elem);
@@ -331,6 +342,7 @@
 				e.preventDefault();
 				if(e.target.nodeName !== 'A') return;
 				delegate.feedLinkWasClicked(e.target);
+				this.view.shouldSelect(e.target);
 			};
 			self.didSetView = function(v){
 				this.view.container.addEventListener('click', this, true);
