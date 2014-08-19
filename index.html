@@ -236,8 +236,20 @@
 		my.Feed = function(obj){
 			var self = my.Observable();
 			function getLink(obj){
+				if(obj.channel){
+					return {
+						href: obj.channel.link
+					};
+				}
+				
+				if(obj.link.forEach){
+					var link = null;
+					while(link = obj.link.pop()){
+						if(link['@type'] === 'text/html') return {href: link['@href']};
+					}
+				}
 				return {
-					href: obj.channel ? obj.channel.link : obj.link['@href']
+					href: "No link found"
 				};
 			}
 			function getEntries(obj){
@@ -260,7 +272,9 @@
 				return obj.icon || null;
 			}
 			function getTitle(obj){
-				return obj.title || obj.channel.title;
+				if(obj.channel) return obj.channel.title;
+				if(obj.title.keyValue) return obj.title.keyValue;
+				return obj.title;
 			}
 			if(obj){
 				self.link = getLink(obj);
